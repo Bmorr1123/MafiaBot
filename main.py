@@ -19,6 +19,5 @@ cogs = [Default(bot), Mafia(bot)]
 for cog in cogs:
     bot.add_cog(cog)
     print(f"Loaded \"{cog.qualified_name}\" cog!")
-    for command in cog.walk_commands():
-        print(command)
+
 bot.run(get_key("token"))

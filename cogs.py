@@ -80,7 +80,7 @@ class Mafia(commands.Cog):
         rlm_category = discord.utils.find(lambda cat: cat.name == "Rocket League Mafia", guild.categories)
         if rlm_category is None:
             rlm_category = await guild.create_category("Rocket League Mafia")
-        rlm_queue = discord.utils.get(rlm_category.channels, name="Rocket League Mafia", type=discord.ChannelType.voice)
+        rlm_queue = discord.utils.get(rlm_category.channels, name="Mafia Queue", type=discord.ChannelType.voice)
         if rlm_queue is None:
             rlm_queue = await guild.create_voice_channel('Mafia Queue', category=rlm_category)
         await rlm_queue.edit(user_limit=6)
