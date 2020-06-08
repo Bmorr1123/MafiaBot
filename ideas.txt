@@ -1,5 +1,6 @@
 Guilds (Folder):
     guild.id (Dict) {
+        "category": rlm_category.id,
         "queue": rlm_queue.id,
         "mafia_players": [
             player0,
