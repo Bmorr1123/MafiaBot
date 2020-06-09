@@ -33,12 +33,8 @@ class Mafia(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.data = {
-            "guilds": {
-
-            },
-            "players": {
-
-            },
+            "guilds": {},
+            "players": {},
         }
         # Load a list of guild ids that have setup Mafia
         for guild_id in os.listdir("guilds"):
