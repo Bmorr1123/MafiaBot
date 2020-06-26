@@ -30,3 +30,5 @@ game (Dict) {
         player2
     }
 }
+
+Make temporary reactions of players pfps
