@@ -1,7 +1,5 @@
 import asyncio
 import discord
-import json
-import os
 from random import shuffle
 from discord.ext import commands
 
@@ -12,7 +10,7 @@ class Default(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f"Logged in and listening as {self.bot.user}!\n")
+        print(f"Logged in and listening as {self.bot.user}!")
         await self.bot.change_presence(activity=discord.Game(name="Rocket League Mafia"))  # Set Discord status
 
     @commands.Cog.listener()
@@ -66,6 +64,14 @@ class Mafia(commands.Cog):
                 await self.create_game(channel)
 
     @mafia.command()
+    async def help(self, ctx):
+        await ctx.message.delete()  # Delete player message
+
+        #  Send message
+        await ctx.send(f"Use ?mafia report \'team\' to report game winner. Ex. ?mafia report blue\n"
+                       f"Then react to the player who corresponds to your guess for the mafia.")
+
+    @mafia.command()
     async def rules(self, ctx):
         await ctx.message.delete()  # Delete player message
 
@@ -101,6 +107,109 @@ class Mafia(commands.Cog):
             game.round_winner = "Orange"
         else:
             await ctx.message.delete()
+            return
+
+        if game.round_winner.lower() == "blue" or game.round_winner.lower() == "orange":
+            plrs = ""
+            reactions = "🇦 🇧 🇨 🇩 🇪 🇫".split(" ")
+            for i, player in enumerate(game.players):
+                plrs += f"{reactions[i]} – {player.name}\n"
+            msg = await ctx.send(f"{plrs}")
+            game.voting_message = msg
+            for _g in range(len(game.players)):
+                await msg.add_reaction(reactions[_g])
+
+    def _get_emoji(self, emoji):
+        for i, reaction in enumerate("🇦 🇧 🇨 🇩 🇪 🇫".split(" ")):
+            if emoji in reaction or reaction in emoji:
+                return i
+        return -1
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload):
+
+        if self.bot.get_channel(payload.channel_id).name != "mafia-text-room" or self._get_emoji(payload.emoji.name) <\
+                0 or "mafia" in self.bot.get_user(payload.user_id).name.lower():
+            return
+        else:
+            channel = self.bot.get_channel(payload.channel_id)
+
+        game = None
+        for g in self.games:
+            if self.bot.get_channel(payload.channel_id) == g.text_channel:
+                game = g
+                break
+
+        if payload.message_id != game.voting_message.id:
+            return
+
+        for player in game.players:
+            if player.name == payload.member.name:
+                if player.name == game.players[self._get_emoji(payload.emoji.name)].name:  # If the player picks themself
+                    await channel.send(f"You can\'t pick yourself, {self.bot.get_user(payload.user_id).name}.")
+                elif player.guess is not None:  # If player already made a guess
+                    await channel.send(f"{self.bot.get_user(payload.user_id)}, you have already guessed this round.")
+                elif str(self._get_emoji(payload.emoji.name)) in "0 1 2 3 4 5".split(" "):  # If player is correctly picked
+                    player.guess = self._get_emoji(payload.emoji.name)
+
+        all_guessed = True
+        mafia, mafia_name, mafia_obj = None, None, None
+        for i, player in enumerate(game.players):
+            if player.guess is None:
+                all_guessed = False
+            if player.role == "Mafia":
+                mafia = i
+                mafia_name = player.name
+                mafia_obj = player
+
+        if all_guessed:
+            await self.bot.get_channel(payload.channel_id).send(f"{mafia_name} was the Mafia!")  # Send message on who was the mafia
+            game.round += 1
+            game.round_winner = None
+
+            mafia_guessed = 0
+            for player in game.players:
+                if player.guess == mafia:
+                    print(f"{player.name} got a point!")
+                    player.score += 1
+                    mafia_guessed += 1
+
+            if mafia_guessed == 0:
+                mafia_obj.score += 3
+
+            if game.round == game.total_rounds:  # If all the rounds of the game have been played
+                # Print out player scores
+                scoreboard = "```\n"
+                for player in self.sort_player_scores(game.players):
+                    scoreboard += f"{player.name} - {player.score}\n"
+                scoreboard += "```"
+                await self.bot.get_channel(payload.channel_id).send(scoreboard)
+
+                self.games.remove(game)  # Remove game from list of games
+
+                await asyncio.sleep(30)  # Wait 30 seconds
+                await self.bot.get_channel(payload.channel_id).delete()  # Delete text-channel
+            else:  # If there are still rounds to play
+
+                for player in game.players:
+                    player.guess = None
+                shuffle(game.players)
+
+                blue = game.players[0:len(game.players) // 2]
+
+                shuffle(game.players)
+                for i, player in enumerate(game.players):
+                    team = "Orange"
+                    if player in blue:
+                        team = "Blue"
+                    player.team = team
+                    if i == 0:
+                        player.role = "Mafia"
+                        await player.obj.send(f"You are the MAFIA!")  # Send DM to mafia
+                    else:
+                        player.role = None
+
+                await self.msg_teams(game.players, self.bot.get_channel(payload.channel_id))
 
     @mafia.command()
     async def exit(self, ctx):
@@ -128,6 +237,15 @@ class Mafia(commands.Cog):
             ret.append(highest)
             p.remove(highest)
         return ret
+
+    async def msg_teams(self, players, text_channel):
+        blue, orange = "", ""
+        for player in players:
+            if player.team.lower() == "blue":
+                blue += f"\t{player.name}\n"
+            else:
+                orange += f"\t{player.name}\n"
+        await text_channel.send(f"```\nBlue:\n{blue}\nOrange:\n{orange}```")
 
     @mafia.command()
     async def guess(self, ctx, arg):
@@ -208,10 +326,10 @@ class Mafia(commands.Cog):
                     player.team = team
                     if i == 0:
                         player.role = "Mafia"
-                        await player.obj.send(f"You are on {team} team and you are the MAFIA!")  # Send DM to mafia
+                        await player.obj.send(f"You are the MAFIA!")  # Send DM to mafia
                     else:
                         player.role = None
-                        await player.obj.send(f"You are on {team} team and you are INNOCENT!")  # Send DM to innocents
+                await self.msg_teams(game.players, ctx)
 
     async def create_game_channels(self, channel):
         text_overwrites = {
@@ -235,8 +353,9 @@ class Mafia(commands.Cog):
             names += member.name + ", "
             await member.move_to(voice_channel)
             await voice_channel.set_permissions(member, connect=True)
-            await text_channel.set_permissions(member, read_messages=True)
-        await text_channel.send(f"__Players: {names[0:-2]}__")
+            await text_channel.set_permissions(member, read_messages=True, send_messages=True,
+                                               read_message_history=True, add_reactions=True)
+        await text_channel.send(f"__Players: {names[0:-2]}__\nUse ?mafia help for help on report syntax.")
         return voice_channel, text_channel
 
     async def create_game(self, channel):
@@ -254,10 +373,10 @@ class Mafia(commands.Cog):
                 team = "Blue"
             if i == 0:
                 player_objects.append(Player(player.name, "Mafia", player, team))
-                await player.send(f"---New Game---\nYou are on {team} team and you are the MAFIA!")
+                await player.send(f"You are the MAFIA!")
             else:
                 player_objects.append(Player(player.name, None, player, team))
-                await player.send(f"---New Game---\nYou are on {team} team and you are INNOCENT!")
+        await self.msg_teams(player_objects, text)
         self.games.append(Game(voice, text, player_objects, 5))
 
     @mafia.command()
@@ -292,6 +411,7 @@ class Mafia(commands.Cog):
         await asyncio.sleep(30)
         await bots_message.delete()
 
+
 class Player:
     def __init__(self, username, role, obj, team):
         self.name = username
@@ -304,6 +424,7 @@ class Player:
     def __str__(self):
         return f"{self.name} - {self.team} - {self.role}"
 
+
 class Game:
     def __init__(self, voice_channel, text_channel, players, total_rounds):
         self.voice_channel = voice_channel
@@ -315,3 +436,4 @@ class Game:
         for p in self.players:  # Creates a list of all usernames of the players
             self.player_names.append(p.name)
         self.round_winner = None
+        self.voting_message = None
