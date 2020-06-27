@@ -170,7 +170,6 @@ class Mafia(commands.Cog):
             mafia_guessed = 0
             for player in game.players:
                 if player.guess == mafia:
-                    print(f"{player.name} got a point!")
                     player.score += 1
                     mafia_guessed += 1
 
