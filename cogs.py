@@ -27,6 +27,10 @@ class Default(commands.Cog):
         for message in reversed(messages):
             await message.delete()
 
+    @commands.command()
+    async def info(self, ctx):
+        await ctx.send("This is a bot developed by Michael (Dolphino) and Ben (Bmorr) made for playing Rocket League Mafia!")
+
 
 class Mafia(commands.Cog):
     def __init__(self, bot):
@@ -179,7 +183,7 @@ class Mafia(commands.Cog):
 
             if game.round == game.total_rounds:  # If all the rounds of the game have been played
                 # Print out player scores
-                scoreboard = "```\n"
+                scoreboard = "__Game Over. Here are the results:__```\n"
                 for player in self.sort_player_scores(game.players):
                     scoreboard += f"{player.name} - {player.score}\n"
                 scoreboard += "```"
@@ -355,7 +359,7 @@ class Mafia(commands.Cog):
             await voice_channel.set_permissions(member, connect=True)
             await text_channel.set_permissions(member, read_messages=True, send_messages=True,
                                                read_message_history=True, add_reactions=True)
-        await text_channel.send(f"__Players: {names[0:-2]}__\nUse ?mafia help for help on report syntax.")
+        await text_channel.send(f"__Players: {names[0:-2]}__\nUse ?mafia help for help on reporting syntax.")
         return voice_channel, text_channel
 
     async def create_game(self, channel):

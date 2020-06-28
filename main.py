@@ -1,7 +1,7 @@
 from discord.ext import commands
 from cogs import *
 
-lines = open("config.txt", "r").readlines()
+lines = open("text_config.txt", "r").readlines()
 def get_key(key):
     for line in lines:
         if line.startswith(key):
@@ -19,5 +19,4 @@ for cog in cogs:
     bot.add_cog(cog)
     print(f"Loaded \"{cog.qualified_name}\" cog!")
 
-# bot.run(get_key("token"))
-bot.run("NzI2MDYzMzYwNTE2MjkyNjU5.XvX11w.PqhZNDjWEFfGSQJ2aiPhA8NI2LI")
+bot.run(get_key("token"))
