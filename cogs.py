@@ -77,16 +77,16 @@ class Mafia(commands.Cog):
 
         #  Send rules message
         await ctx.send(f"To Start, everyone must go into the Mafia Queue channel. "
-                 f"Once it is full, those members will be automatically moved into a voice "
-                 f"channel and a text channel will be created. Each player will also be DMed "
-                 f"with their team and role for the round. The goal of the mafia is to lose game without being caught "
-                 f"throwing.\n\nAfter the Rocket League match is played, one person "
-                 f"must report the team who won in the text channel using ?mafia report "
-                 f"winning_team.\n\nThen, each player must guess who the mafia is using ?mafia guess "
-                 f"username. Once each player, including the mafia, has guessed, each player who "
-                 f"correctly guessed who the mafia was will be awarded 1 point. If no one guesses "
-                 f"who the mafia is and the mafia\'s team loses, the mafia will be awarded 3 "
-                 f"points.\n\nWhichever player has the most points at the end of 5 rounds wins.")
+                     f"Once it is full, those members will be automatically moved into a voice "
+                     f"channel and a text channel will be created. Each player will also be DMed "
+                     f"with their team and role for the round. The goal of the mafia is to lose game without being caught "
+                     f"throwing.\n\nAfter the Rocket League match is played, one person "
+                     f"must report the team who won in the text channel using ?mafia report "
+                     f"winning_team.\n\nThen, each player must guess who the mafia is using ?mafia guess "
+                     f"username. Once each player, including the mafia, has guessed, each player who "
+                     f"correctly guessed who the mafia was will be awarded 1 point. If no one guesses "
+                     f"who the mafia is and the mafia\'s team loses, the mafia will be awarded 3 "
+                     f"points.\n\nWhichever player has the most points at the end of 5 rounds wins.")
 
     @mafia.command()
     async def report(self, ctx, arg):
@@ -144,28 +144,26 @@ class Mafia(commands.Cog):
             return
 
         for player in game.players:
-            if player.name == payload.member.name:
-                if player.name == game.players[self._get_emoji(payload.emoji.name)].name:  # If the player picks themself
+            if player.obj.id == payload.member.id:
+                if player.obj.id == game.players[self._get_emoji(payload.emoji.name)].obj.id:  # If the player picks them self
                     await channel.send(f"You can\'t pick yourself, {self.bot.get_user(payload.user_id).name}.")
                 elif player.guess is not None:  # If player already made a guess
                     await channel.send(f"{self.bot.get_user(payload.user_id)}, you have already guessed this round.")
                 elif str(self._get_emoji(payload.emoji.name)) in "0 1 2 3 4 5".split(" "):  # If player is correctly picked
-                    player.guess = self._get_emoji(payload.emoji.name)
+                    player.guess = game.players[self._get_emoji(payload.emoji.name)].obj.id
 
         all_guessed = True
         mafia, mafia_name, mafia_obj = None, None, None
-        for i, player in enumerate(game.players):
+        for player in game.players:
             if player.guess is None:
                 all_guessed = False
             if player.role == "Mafia":
-                mafia = i
+                mafia = player.obj.id
                 mafia_name = player.name
                 mafia_obj = player
 
         if all_guessed:
             await self.bot.get_channel(payload.channel_id).send(f"{mafia_name} was the Mafia!")  # Send message on who was the mafia
-            game.round += 1
-            game.round_winner = None
 
             mafia_guessed = 0
             for player in game.players:
@@ -173,8 +171,11 @@ class Mafia(commands.Cog):
                     player.score += 1
                     mafia_guessed += 1
 
-            if mafia_guessed == 0:
+            if mafia_guessed and mafia_obj.team != game.round_winner == 0:
                 mafia_obj.score += 3
+
+            game.round += 1
+            game.round_winner = None
 
             if game.round == game.total_rounds:  # If all the rounds of the game have been played
                 # Print out player scores

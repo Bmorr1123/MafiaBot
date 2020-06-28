@@ -19,4 +19,5 @@ for cog in cogs:
     bot.add_cog(cog)
     print(f"Loaded \"{cog.qualified_name}\" cog!")
 
-bot.run(get_key("token"))
+# bot.run(get_key("token"))
+bot.run("NzI2MDYzMzYwNTE2MjkyNjU5.XvX11w.PqhZNDjWEFfGSQJ2aiPhA8NI2LI")
