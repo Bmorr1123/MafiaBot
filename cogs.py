@@ -36,12 +36,19 @@ class Mafia(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.games = []
+        self.settings = []
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print(f"Guilds: {len(self.bot.guilds)}")
+        for guild in self.bot.guilds:
+            self.settings.append(Settings(guild))
 
     @commands.group()
     async def mafia(self, ctx):
         """All mafia related commands"""
         if ctx.invoked_subcommand is None:
-            await self.bot.say("Invalid sub command passed.")
+            await ctx.send("Invalid sub command passed.")
 
     def is_queue_channel(self, channel):
         if channel is None:
@@ -49,6 +56,39 @@ class Mafia(commands.Cog):
         if channel.name == "Mafia Queue":
             return True
         return False
+
+    @mafia.command()
+    async def toggle_jester(self, ctx):
+        await ctx.message.delete()
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                setting.jester = not setting.jester
+                msg = await ctx.send(f"Jester Mode: {setting.jester}")
+                await asyncio.sleep(5)
+                await msg.delete()
+                break
+
+    @mafia.command()
+    async def change_rounds(self, ctx, arg: int):
+        await ctx.message.delete()
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                setting.num_rounds = arg
+                msg = await ctx.send(f"Number of Rounds: {setting.num_rounds}")
+                await asyncio.sleep(5)
+                await msg.delete()
+                break
+
+    @mafia.command()
+    async def settings(self, ctx):
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                msg = await ctx.send(f"{setting}")
+                await asyncio.sleep(10)
+                await msg.delete()
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -158,6 +198,7 @@ class Mafia(commands.Cog):
 
         all_guessed = True
         mafia, mafia_name, mafia_obj = None, None, None
+        jester, jester_name, jester_obj = None, None, None
         for player in game.players:
             if player.guess is None:
                 all_guessed = False
@@ -165,15 +206,25 @@ class Mafia(commands.Cog):
                 mafia = player.obj.id
                 mafia_name = player.name
                 mafia_obj = player
+            elif player.role == "Jester":
+                jester = player.obj.id
+                jester_name = player.name
+                jester_obj = player
+
 
         if all_guessed:
-            await self.bot.get_channel(payload.channel_id).send(f"{mafia_name} was the Mafia!")  # Send message on who was the mafia
+            await self.bot.get_channel(payload.channel_id).send(f"{mafia_name} was the **Mafia**!")  # Send message on who was the mafia
+            if jester is not None:
+                await self.bot.get_channel(payload.channel_id).send(
+                    f"{jester_name} was the **Jester**!")  # Send message on who was the jester
 
             mafia_guessed = 0
             for player in game.players:
                 if player.guess == mafia:
                     player.score += 1
                     mafia_guessed += 1
+                elif player.guess == jester:
+                    jester_obj.score += 1
 
             if mafia_guessed and mafia_obj.team != game.round_winner == 0:
                 mafia_obj.score += 3
@@ -210,6 +261,9 @@ class Mafia(commands.Cog):
                     if i == 0:
                         player.role = "Mafia"
                         await player.obj.send(f"You are the MAFIA!")  # Send DM to mafia
+                    elif i == 1 and game.jester:
+                        player.role = "Jester"
+                        await player.obj.send(f"You are the JESTER!")  # Send DM to jester if jester mode is enabled
                     else:
                         player.role = None
 
@@ -363,6 +417,12 @@ class Mafia(commands.Cog):
         return voice_channel, text_channel
 
     async def create_game(self, channel):
+        _setting = None
+        guild_id = channel.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                _setting = setting
+
         player_objects = []
         players = channel.members
         voice, text = await self.create_game_channels(channel)
@@ -378,10 +438,13 @@ class Mafia(commands.Cog):
             if i == 0:
                 player_objects.append(Player(player.name, "Mafia", player, team))
                 await player.send(f"You are the MAFIA!")
+            elif i == 1 and _setting.jester:
+                player_objects.append(Player(player.name, "Jester", player, team))
+                await player.send(f"You are the JESTER!")
             else:
                 player_objects.append(Player(player.name, None, player, team))
         await self.msg_teams(player_objects, text)
-        self.games.append(Game(voice, text, player_objects, 5))
+        self.games.append(Game(voice, text, player_objects, _setting))
 
     @mafia.command()
     @commands.has_permissions(manage_guild=True)
@@ -430,14 +493,26 @@ class Player:
 
 
 class Game:
-    def __init__(self, voice_channel, text_channel, players, total_rounds):
+    def __init__(self, voice_channel, text_channel, players, setting):
         self.voice_channel = voice_channel
         self.text_channel = text_channel
         self.players = players
-        self.total_rounds = total_rounds
+        self.total_rounds = setting.num_rounds
+        self.jester = setting.jester
         self.round = 0
         self.player_names = []
         for p in self.players:  # Creates a list of all usernames of the players
             self.player_names.append(p.name)
         self.round_winner = None
         self.voting_message = None
+
+
+class Settings:
+    def __init__(self, guild, default_rounds=5, default_jester=False):
+        self.guild = guild
+        self.id = guild.id
+        self.num_rounds = default_rounds
+        self.jester = default_jester
+
+    def __str__(self):
+        return f"Id: {self.id}, Rounds: {self.num_rounds}, Jester Mode: {self.jester}"
