@@ -226,7 +226,7 @@ class Mafia(commands.Cog):
                 elif player.guess == jester:
                     jester_obj.score += 1
 
-            if mafia_guessed and mafia_obj.team != game.round_winner == 0:
+            if mafia_guessed == 0 and mafia_obj.team.lower() != game.round_winner.lower():
                 mafia_obj.score += 3
 
             game.round += 1
