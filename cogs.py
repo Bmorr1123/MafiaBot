@@ -38,141 +38,20 @@ class Mafia(commands.Cog):
         self.games = []
         self.settings = []
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        print(f"Guilds: {len(self.bot.guilds)}")
-        for guild in self.bot.guilds:
-            self.settings.append(Settings(guild))
 
+    # commands.group()
     @commands.group()
     async def mafia(self, ctx):
         """All mafia related commands"""
         if ctx.invoked_subcommand is None:
             await ctx.send("Invalid sub command passed.")
 
-    def is_queue_channel(self, channel):
-        if channel is None:
-            return False
-        if channel.name == "Mafia Queue":
-            return True
-        return False
 
-    @mafia.command()
-    async def toggle_jester(self, ctx):
-        await ctx.message.delete()
-        guild_id = ctx.guild.id
-        for setting in self.settings:
-            if setting.id == guild_id:
-                setting.jester = not setting.jester
-                msg = await ctx.send(f"Jester Mode: {setting.jester}")
-                await asyncio.sleep(5)
-                await msg.delete()
-                break
-
-    @mafia.command()
-    async def change_rounds(self, ctx, arg: int):
-        await ctx.message.delete()
-        guild_id = ctx.guild.id
-        for setting in self.settings:
-            if setting.id == guild_id:
-                setting.num_rounds = arg
-                msg = await ctx.send(f"Number of Rounds: {setting.num_rounds}")
-                await asyncio.sleep(5)
-                await msg.delete()
-                break
-
-    @mafia.command()
-    async def settings(self, ctx):
-        guild_id = ctx.guild.id
-        for setting in self.settings:
-            if setting.id == guild_id:
-                msg = await ctx.send(f"{setting}")
-                await asyncio.sleep(10)
-                await msg.delete()
-
-    @commands.Cog.listener()
-    async def on_voice_state_update(self, member, before, after):
-        # Check if Mafia
-        if before.channel is None:
-            pass
-        elif before.channel.name.startswith("Mafia Game Room"):
-            if len(before.channel.members) == 0:
-                await before.channel.delete()
-        if after.channel is None or after.channel.name != "Mafia Queue":
-            return
-        print(f"{member} updated their voice state in a mafia server.")
-        # Check if moved in
-        if self.is_queue_channel(after.channel):
-            channel = after.channel
-            if len(channel.members) == channel.user_limit:
-                await self.create_game(channel)
-
-    @mafia.command()
-    async def help(self, ctx):
-        await ctx.message.delete()  # Delete player message
-
-        #  Send message
-        await ctx.send(f"Use ?mafia report \'team\' to report game winner. Ex. ?mafia report blue\n"
-                       f"Then react to the player who corresponds to your guess for the mafia.")
-
-    @mafia.command()
-    async def rules(self, ctx):
-        await ctx.message.delete()  # Delete player message
-
-        #  Send rules message
-        await ctx.send(f"To Start, everyone must go into the Mafia Queue channel. "
-                     f"Once it is full, those members will be automatically moved into a voice "
-                     f"channel and a text channel will be created. Each player will also be DMed "
-                     f"with their team and role for the round. The goal of the mafia is to lose game without being caught "
-                     f"throwing.\n\nAfter the Rocket League match is played, one person "
-                     f"must report the team who won in the text channel using ?mafia report "
-                     f"winning_team.\n\nThen, each player must guess who the mafia is using ?mafia guess "
-                     f"username. Once each player, including the mafia, has guessed, each player who "
-                     f"correctly guessed who the mafia was will be awarded 1 point. If no one guesses "
-                     f"who the mafia is and the mafia\'s team loses, the mafia will be awarded 3 "
-                     f"points.\n\nWhichever player has the most points at the end of 5 rounds wins.")
-
-    @mafia.command()
-    async def report(self, ctx, arg):
-
-        if ctx.channel.name != "mafia-text-room":
-            await ctx.message.delete()
-            return
-
-        game = None
-        for g in self.games:
-            if ctx.channel == g.text_channel:
-                game = g
-                break
-
-        if arg.lower() == "blue":
-            game.round_winner = "Blue"
-        elif arg.lower() == "orange":
-            game.round_winner = "Orange"
-        else:
-            await ctx.message.delete()
-            return
-
-        if game.round_winner.lower() == "blue" or game.round_winner.lower() == "orange":
-            plrs = ""
-            reactions = "🇦 🇧 🇨 🇩 🇪 🇫".split(" ")
-            for i, player in enumerate(game.players):
-                plrs += f"{reactions[i]} – {player.name}\n"
-            msg = await ctx.send(f"{plrs}")
-            game.voting_message = msg
-            for _g in range(len(game.players)):
-                await msg.add_reaction(reactions[_g])
-
-    def _get_emoji(self, emoji):
-        for i, reaction in enumerate("🇦 🇧 🇨 🇩 🇪 🇫".split(" ")):
-            if emoji in reaction or reaction in emoji:
-                return i
-        return -1
-
+    # commands.Cog.listener()
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
 
-        if self.bot.get_channel(payload.channel_id).name != "mafia-text-room" or self._get_emoji(payload.emoji.name) <\
+        if self.bot.get_channel(payload.channel_id).name != "mafia-text-room" or self.get_emoji(payload.emoji.name) < \
                 0 or "mafia" in self.bot.get_user(payload.user_id).name.lower():
             return
         else:
@@ -189,12 +68,14 @@ class Mafia(commands.Cog):
 
         for player in game.players:
             if player.obj.id == payload.member.id:
-                if player.obj.id == game.players[self._get_emoji(payload.emoji.name)].obj.id:  # If the player picks them self
+                if player.obj.id == game.players[
+                    self.get_emoji(payload.emoji.name)].obj.id:  # If the player picks them self
                     await channel.send(f"You can\'t pick yourself, {self.bot.get_user(payload.user_id).name}.")
                 elif player.guess is not None:  # If player already made a guess
                     await channel.send(f"{self.bot.get_user(payload.user_id)}, you have already guessed this round.")
-                elif str(self._get_emoji(payload.emoji.name)) in "0 1 2 3 4 5".split(" "):  # If player is correctly picked
-                    player.guess = game.players[self._get_emoji(payload.emoji.name)].obj.id
+                elif str(self.get_emoji(payload.emoji.name)) in "0 1 2 3 4 5".split(
+                        " "):  # If player is correctly picked
+                    player.guess = game.players[self.get_emoji(payload.emoji.name)].obj.id
 
         all_guessed = True
         mafia, mafia_name, mafia_obj = None, None, None
@@ -211,9 +92,9 @@ class Mafia(commands.Cog):
                 jester_name = player.name
                 jester_obj = player
 
-
         if all_guessed:
-            await self.bot.get_channel(payload.channel_id).send(f"{mafia_name} was the **Mafia**!")  # Send message on who was the mafia
+            await self.bot.get_channel(payload.channel_id).send(
+                f"{mafia_name} was the **Mafia**!")  # Send message on who was the mafia
             if jester is not None:
                 await self.bot.get_channel(payload.channel_id).send(
                     f"{jester_name} was the **Jester**!")  # Send message on who was the jester
@@ -269,6 +150,43 @@ class Mafia(commands.Cog):
 
                 await self.msg_teams(game.players, self.bot.get_channel(payload.channel_id))
 
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print(f"Guilds: {len(self.bot.guilds)}")
+        for guild in self.bot.guilds:
+            self.settings.append(Settings(guild))
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        # Check if Mafia
+        if before.channel is None:
+            pass
+        elif before.channel.name.startswith("Mafia Game Room"):
+            if len(before.channel.members) == 0:
+                await before.channel.delete()
+        if after.channel is None or after.channel.name != "Mafia Queue":
+            return
+        print(f"{member} updated their voice state in a mafia server.")
+        # Check if moved in
+        if self.is_queue_channel(after.channel):
+            channel = after.channel
+            if len(channel.members) == channel.user_limit:
+                await self.create_game(channel)
+
+
+    # mafia.command()
+    @mafia.command()
+    async def change_rounds(self, ctx, arg: int):
+        await ctx.message.delete()
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                setting.num_rounds = arg
+                msg = await ctx.send(f"Number of Rounds: {setting.num_rounds}")
+                await asyncio.sleep(5)
+                await msg.delete()
+                break
+
     @mafia.command()
     async def exit(self, ctx):
         if ctx.channel.name == "mafia-text-room":
@@ -284,29 +202,16 @@ class Mafia(commands.Cog):
 
             await ctx.channel.delete()
 
-    def sort_player_scores(self, players):
-        p = players
-        ret = []
-        while len(p) > 0:
-            highest = p[0]
-            for player in p:
-                if player.score > highest.score:
-                    highest = player
-            ret.append(highest)
-            p.remove(highest)
-        return ret
+    @mafia.command()
+    async def help(self, ctx):
+        await ctx.message.delete()  # Delete player message
 
-    async def msg_teams(self, players, text_channel):
-        blue, orange = "", ""
-        for player in players:
-            if player.team.lower() == "blue":
-                blue += f"\t{player.name}\n"
-            else:
-                orange += f"\t{player.name}\n"
-        await text_channel.send(f"```\nBlue:\n{blue}\nOrange:\n{orange}```")
+        #  Send message
+        await ctx.send(f"Use ?mafia report \'team\' to report game winner. Ex. ?mafia report blue\n"
+                       f"Then react to the player who corresponds to your guess for the mafia.")
 
     @mafia.command()
-    async def guess(self, ctx, arg):
+    async def report(self, ctx, arg):
 
         if ctx.channel.name != "mafia-text-room":
             await ctx.message.delete()
@@ -318,103 +223,130 @@ class Mafia(commands.Cog):
                 game = g
                 break
 
-        if game.round_winner is None:
+        if arg.lower() == "blue":
+            game.round_winner = "Blue"
+        elif arg.lower() == "orange":
+            game.round_winner = "Orange"
+        else:
             await ctx.message.delete()
             return
 
-        for player in game.players:
-            if player.name == ctx.message.author.name:
-                if player.name == arg:  # If the player picks themself
-                    await ctx.send("You can\'t pick yourself, dumbass.")
-                    return
-                elif player.guess is not None:  # If player already made a guess
-                    await ctx.send(f"{ctx.message.author}, you have already guessed this round.")
-                    return
-                elif arg in game.player_names:  # If player is correctly picked
-                    player.guess = arg
+        if game.round_winner.lower() == "blue" or game.round_winner.lower() == "orange":
+            plrs = ""
+            reactions = "🇦 🇧 🇨 🇩 🇪 🇫".split(" ")
+            for i, player in enumerate(game.players):
+                plrs += f"{reactions[i]} – {player.name}\n"
+            msg = await ctx.send(f"{plrs}")
+            game.voting_message = msg
+            for _g in range(len(game.players)):
+                await msg.add_reaction(reactions[_g])
 
-        all_guessed = True
-        mafia = None
-        mafia_obj = None
-        for player in game.players:
-            if player.guess is None:
-                all_guessed = False
-            if player.role == "Mafia":
-                mafia = player.name
-                mafia_obj = player
+    @mafia.command()
+    async def rules(self, ctx):
+        await ctx.message.delete()  # Delete player message
 
-        if all_guessed:
-            await ctx.send(f"{mafia} was the Mafia!")  # Send message on who was the mafia
-            game.round += 1
-            game.round_winner = None
+        settings = None
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                settings = setting
 
-            mafia_guessed = 0
-            for player in game.players:
-                if player.guess == mafia:
-                    player.score += 1
-                    mafia_guessed += 1
+        if settings is None:
+            return
 
-            if mafia_guessed == 0:
-                mafia_obj.score += 3
+        #  Send rules message
+        await ctx.send(f"To Start, everyone must go into the Mafia Queue channel. "
+                       f"Once it is full, those members will be automatically moved into a voice "
+                       f"channel and a text channel will be created. Each player will also be DMed "
+                       f"with their team and role for the round. The goal of the mafia is to lose game without being caught "
+                       f"throwing.\n\nAfter the Rocket League match is played, one person "
+                       f"must report the team who won in the text channel using ?mafia report "
+                       f"winning_team.\n\nThen, each player must guess who the mafia is using ?mafia guess "
+                       f"username. Once each player, including the mafia, has guessed, each player who "
+                       f"correctly guessed who the mafia was will be awarded 1 point. The Jester will receive one point "
+                       f"for each player who guesses them. If no one guesses "
+                       f"who the mafia is and the mafia\'s team loses, the mafia will be awarded 3 "
+                       f"points.\n\nWhichever player has the most points at the end of {settings.num_rounds} rounds wins.")
 
-            if game.round == game.total_rounds:  # If all the rounds of the game have been played
-                # Print out player scores
-                scoreboard = "```\n"
-                for player in self.sort_player_scores(game.players):
-                    scoreboard += f"{player.name} - {player.score}\n"
-                scoreboard += "```"
-                await ctx.send(scoreboard)
+    @mafia.command()
+    async def settings(self, ctx):
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                msg = await ctx.send(f"{setting}")
+                await asyncio.sleep(10)
+                await msg.delete()
 
-                self.games.remove(game)  # Remove game from list of games
+    @mafia.command()
+    async def toggle_jester(self, ctx):
+        await ctx.message.delete()
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                setting.jester = not setting.jester
+                msg = await ctx.send(f"Jester Mode: {setting.jester}")
+                await asyncio.sleep(5)
+                await msg.delete()
+                break
 
-                await asyncio.sleep(30)  # Wait 30 seconds
-                await ctx.channel.delete()  # Delete text-channel
-            else:  # If there are still rounds to play
-                for player in game.players:
-                    player.guess = None
-                shuffle(game.players)
+    @mafia.command()
+    @commands.has_permissions(manage_guild=True)
+    async def delete(self, ctx):
+        # Deleting Channel
+        rlm_category = discord.utils.find(lambda cat: cat.name == "Rocket League Mafia", ctx.guild.categories)
+        if rlm_category is not None:
+            for channel in rlm_category.channels:
+                await channel.delete(reason=f"{ctx.author} ran delete_mafia.")
+            await rlm_category.delete(reason=f"{ctx.author} ran delete_mafia.")
+        bots_message = await ctx.send("Mafia deleted.")
+        # Deleting Message
+        await ctx.message.delete()
+        await asyncio.sleep(30)
+        await bots_message.delete()
 
-                blue = game.players[0:len(game.players) // 2]
+    @mafia.command()
+    @commands.has_permissions(manage_guild=True)
+    async def setup(self, ctx):
+        guild = ctx.guild
+        # Category/Channel creation
+        rlm_category = discord.utils.find(lambda cat: cat.name == "Rocket League Mafia", guild.categories)
+        if rlm_category is None:
+            rlm_category = await guild.create_category("Rocket League Mafia")
+        rlm_queue = discord.utils.get(rlm_category.channels, name="Mafia Queue", type=discord.ChannelType.voice)
+        if rlm_queue is None:
+            rlm_queue = await guild.create_voice_channel('Mafia Queue', category=rlm_category)
+        await rlm_queue.edit(user_limit=6)
+        bots_message = await ctx.send("Mafia setup complete.")
+        await ctx.message.delete()
+        await asyncio.sleep(5)
+        await bots_message.delete()
 
-                shuffle(game.players)
-                for i, player in enumerate(game.players):
-                    team = "Orange"
-                    if player in blue:
-                        team = "Blue"
-                    player.team = team
-                    if i == 0:
-                        player.role = "Mafia"
-                        await player.obj.send(f"You are the MAFIA!")  # Send DM to mafia
-                    else:
-                        player.role = None
-                await self.msg_teams(game.players, ctx)
 
-    async def create_game_channels(self, channel):
-        text_overwrites = {
-            channel.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        }
-        voice_overwrites = {
-            channel.guild.default_role: discord.PermissionOverwrite(connect=False),
-        }
-        voice_channel = await channel.guild.create_voice_channel(
-            'Mafia Game Room',
-            category=channel.category,
-            overwrites=voice_overwrites
-        )
-        text_channel = await channel.guild.create_text_channel(
-            'Mafia-Text-Room',
-            category=channel.category,
-            overwrites=text_overwrites
-        )
-        names = ""
-        for member in channel.members:
-            names += member.name + ", "
-            await member.move_to(voice_channel)
-            await voice_channel.set_permissions(member, connect=True)
-            await text_channel.set_permissions(member, read_messages=True, send_messages=True,
-                                               read_message_history=True, add_reactions=True)
-        await text_channel.send(f"__Players: {names[0:-2]}__\nUse ?mafia help for help on reporting syntax.")
-        return voice_channel, text_channel
+    # Misc
+    def get_emoji(self, emoji):
+        for i, reaction in enumerate("🇦 🇧 🇨 🇩 🇪 🇫".split(" ")):
+            if emoji in reaction or reaction in emoji:
+                return i
+        return -1
+
+    def is_queue_channel(self, channel):
+        if channel is None:
+            return False
+        if channel.name == "Mafia Queue":
+            return True
+        return False
+
+    def sort_player_scores(self, players):
+        p = players
+        ret = []
+        while len(p) > 0:
+            highest = p[0]
+            for player in p:
+                if player.score > highest.score:
+                    highest = player
+            ret.append(highest)
+            p.remove(highest)
+        return ret
 
     async def create_game(self, channel):
         _setting = None
@@ -446,37 +378,41 @@ class Mafia(commands.Cog):
         await self.msg_teams(player_objects, text)
         self.games.append(Game(voice, text, player_objects, _setting))
 
-    @mafia.command()
-    @commands.has_permissions(manage_guild=True)
-    async def setup(self, ctx):
-        guild = ctx.guild
-        # Category/Channel creation
-        rlm_category = discord.utils.find(lambda cat: cat.name == "Rocket League Mafia", guild.categories)
-        if rlm_category is None:
-            rlm_category = await guild.create_category("Rocket League Mafia")
-        rlm_queue = discord.utils.get(rlm_category.channels, name="Mafia Queue", type=discord.ChannelType.voice)
-        if rlm_queue is None:
-            rlm_queue = await guild.create_voice_channel('Mafia Queue', category=rlm_category)
-        await rlm_queue.edit(user_limit=6)
-        bots_message = await ctx.send("Mafia setup complete.")
-        await ctx.message.delete()
-        await asyncio.sleep(5)
-        await bots_message.delete()
+    async def create_game_channels(self, channel):
+        text_overwrites = {
+            channel.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        }
+        voice_overwrites = {
+            channel.guild.default_role: discord.PermissionOverwrite(connect=False),
+        }
+        voice_channel = await channel.guild.create_voice_channel(
+            'Mafia Game Room',
+            category=channel.category,
+            overwrites=voice_overwrites
+        )
+        text_channel = await channel.guild.create_text_channel(
+            'Mafia-Text-Room',
+            category=channel.category,
+            overwrites=text_overwrites
+        )
+        names = ""
+        for member in channel.members:
+            names += member.name + ", "
+            await member.move_to(voice_channel)
+            await voice_channel.set_permissions(member, connect=True)
+            await text_channel.set_permissions(member, read_messages=True, send_messages=True,
+                                               read_message_history=True, add_reactions=True)
+        await text_channel.send(f"__Players: {names[0:-2]}__\nUse ?mafia help for help on reporting syntax.")
+        return voice_channel, text_channel
 
-    @mafia.command()
-    @commands.has_permissions(manage_guild=True)
-    async def delete(self, ctx):
-        # Deleting Channel
-        rlm_category = discord.utils.find(lambda cat: cat.name == "Rocket League Mafia", ctx.guild.categories)
-        if rlm_category is not None:
-            for channel in rlm_category.channels:
-                await channel.delete(reason=f"{ctx.author} ran delete_mafia.")
-            await rlm_category.delete(reason=f"{ctx.author} ran delete_mafia.")
-        bots_message = await ctx.send("Mafia deleted.")
-        # Deleting Message
-        await ctx.message.delete()
-        await asyncio.sleep(30)
-        await bots_message.delete()
+    async def msg_teams(self, players, text_channel):
+        blue, orange = "", ""
+        for player in players:
+            if player.team.lower() == "blue":
+                blue += f"\t{player.name}\n"
+            else:
+                orange += f"\t{player.name}\n"
+        await text_channel.send(f"```\nBlue:\n{blue}\nOrange:\n{orange}```")
 
 
 class Player:
