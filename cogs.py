@@ -28,6 +28,10 @@ class Default(commands.Cog):
             await message.delete()
 
     @commands.command()
+    async def rank(self):
+        return
+
+    @commands.command()
     async def info(self, ctx):
         await ctx.send("This is a bot developed by Michael (Dolphino) and Ben (Bmorr) made for playing Rocket League Mafia!")
 
