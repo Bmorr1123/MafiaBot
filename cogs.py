@@ -379,22 +379,17 @@ class Mafia(commands.Cog):
         self.games.append(Game(voice, text, player_objects, _setting))
 
     async def create_game_channels(self, channel):
-        text_overwrites = {
-            channel.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        }
-        voice_overwrites = {
-            channel.guild.default_role: discord.PermissionOverwrite(connect=False),
-        }
+        guild = channel.guild
         voice_channel = await channel.guild.create_voice_channel(
             'Mafia Game Room',
-            category=channel.category,
-            overwrites=voice_overwrites
+            category=channel.category
         )
+        await voice_channel.set_permissions(guild.default_role, connect=False, view_channel=True)
         text_channel = await channel.guild.create_text_channel(
             'Mafia-Text-Room',
-            category=channel.category,
-            overwrites=text_overwrites
+            category=channel.category
         )
+        await text_channel.set_permissions(guild.default_role, read_messages=False)
         names = ""
         for member in channel.members:
             names += member.name + ", "
