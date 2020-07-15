@@ -401,7 +401,7 @@ class Mafia(commands.Cog):
             await voice_channel.set_permissions(member, connect=True)
             await text_channel.set_permissions(member, read_messages=True, send_messages=True,
                                                read_message_history=True, add_reactions=True)
-        await text_channel.send(f"__Players: {names[0:-2]}__\nUse ?mafia help for help on reporting syntax.")
+        await text_channel.send(f"__Players: {names[0:-2]}__\nUse \'?mafia help\' for help on reporting syntax.")
         return voice_channel, text_channel
 
     async def msg_teams(self, players, text_channel):
@@ -411,7 +411,7 @@ class Mafia(commands.Cog):
                 blue += f"\t{player.name}\n"
             else:
                 orange += f"\t{player.name}\n"
-        await text_channel.send(f"```\nBlue:\n{blue}\nOrange:\n{orange}```")
+        await text_channel.send(f"```\nBlue:\n{blue}\nOrange:\n{orange}\nType ?mafia report [team color] to bring up voting!```")
 
 
 class Player:
