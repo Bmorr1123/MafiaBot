@@ -1,7 +1,7 @@
 from discord.ext import commands
 from cogs import *
 
-lines = open("config.txt", "r").readlines()
+lines = open("text_config.txt", "r").readlines()
 def get_key(key):
     for line in lines:
         if line.startswith(key):
