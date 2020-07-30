@@ -39,6 +39,7 @@ class Default(commands.Cog):
 class Mafia(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        print(type(self.bot), self.bot)
         self.games = []
         self.settings = []
 
@@ -49,6 +50,14 @@ class Mafia(commands.Cog):
         """All mafia related commands"""
         if ctx.invoked_subcommand is None:
             await ctx.send("Invalid sub command passed.")
+
+
+    # @mafia.command()
+    # async def change_nickname(self, ctx, nick: str):
+    #     try:
+    #         await ctx.author.edit(nick=nick)
+    #     except:
+    #         await ctx.send(f"Bot doesn\'t have permission to do that.")
 
 
     # commands.Cog.listener()
@@ -120,9 +129,32 @@ class Mafia(commands.Cog):
             if game.round == game.total_rounds:  # If all the rounds of the game have been played
                 # Print out player scores
                 scoreboard = "__Game Over. Here are the results:__```\n"
-                for player in self.sort_player_scores(game.players):
+                ordered_players = self.sort_player_scores(game.players)
+                winner = ordered_players[0]
+                for player in ordered_players:
                     scoreboard += f"{player.name} - {player.score}\n"
                 scoreboard += "```"
+
+                if winner.score > ordered_players[1].score:
+                    guild_id = channel.guild.id
+                    settings = None
+                    for setting in self.settings:
+                        if setting.id == guild_id:
+                            settings = setting
+
+                    if settings.add_trophies is False:
+                        return
+                    if winner.obj.nick is None:
+                        nick = winner.obj.name + "🏆"
+                    else:
+                        nick = winner.obj.nick + "🏆"
+
+                    try:
+                        await winner.obj.edit(nick=nick)
+                    except:
+                        print("Bot doesn\'t have permission to change nickname for the winner.")
+
+
                 await self.bot.get_channel(payload.channel_id).send(scoreboard)
 
                 self.games.remove(game)  # Remove game from list of games
@@ -187,6 +219,19 @@ class Mafia(commands.Cog):
             if setting.id == guild_id:
                 setting.num_rounds = arg
                 msg = await ctx.send(f"Number of Rounds: {setting.num_rounds}")
+                await asyncio.sleep(5)
+                await msg.delete()
+                break
+
+    # mafia.command()
+    @mafia.command()
+    async def toggle_trophies(self, ctx):
+        await ctx.message.delete()
+        guild_id = ctx.guild.id
+        for setting in self.settings:
+            if setting.id == guild_id:
+                setting.add_trophies = not setting.add_trophies
+                msg = await ctx.send(f"Add Trophies: {setting.add_trophies}")
                 await asyncio.sleep(5)
                 await msg.delete()
                 break
@@ -262,7 +307,7 @@ class Mafia(commands.Cog):
         await ctx.send(f"To Start, everyone must go into the Mafia Queue channel. "
                        f"Once it is full, those members will be automatically moved into a voice "
                        f"channel and a text channel will be created. Each player will also be DMed "
-                       f"with their team and role for the round. The goal of the mafia is to lose game without being caught "
+                       f"with their team and role for the round. The goal of the mafia is to lose the game without being caught "
                        f"throwing.\n\nAfter the Rocket League match is played, one person "
                        f"must report the team who won in the text channel using ?mafia report "
                        f"winning_team.\n\nThen, each player must guess who the mafia is using ?mafia guess "
@@ -443,11 +488,12 @@ class Game:
 
 
 class Settings:
-    def __init__(self, guild, default_rounds=5, default_jester=False):
+    def __init__(self, guild, default_rounds=5, default_jester=False, add_trophies=False):
         self.guild = guild
         self.id = guild.id
         self.num_rounds = default_rounds
         self.jester = default_jester
+        self.add_trophies = add_trophies
 
     def __str__(self):
-        return f"Id: {self.id}, Rounds: {self.num_rounds}, Jester Mode: {self.jester}"
+        return f"Id: {self.id}, Rounds: {self.num_rounds}, Jester Mode: {self.jester}, Add Trophy: {self.add_trophies}"
