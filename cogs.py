@@ -33,7 +33,8 @@ class Default(commands.Cog):
 
     @commands.command()
     async def info(self, ctx):
-        await ctx.send("This is a bot developed by Michael (Dolphino) and Ben (Bmorr) made for playing Rocket League Mafia!")
+        await ctx.send("This is a bot developed by Michael (Dolphino) and "
+                       "Ben (Bmorr) made for playing Rocket League Mafia!")
 
 
 class Mafia(commands.Cog):
@@ -51,14 +52,12 @@ class Mafia(commands.Cog):
         if ctx.invoked_subcommand is None:
             await ctx.send("Invalid sub command passed.")
 
-
     # @mafia.command()
     # async def change_nickname(self, ctx, nick: str):
     #     try:
     #         await ctx.author.edit(nick=nick)
     #     except:
     #         await ctx.send(f"Bot doesn\'t have permission to do that.")
-
 
     # commands.Cog.listener()
     @commands.Cog.listener()
@@ -81,8 +80,7 @@ class Mafia(commands.Cog):
 
         for player in game.players:
             if player.obj.id == payload.member.id:
-                if player.obj.id == game.players[
-                    self.get_emoji(payload.emoji.name)].obj.id:  # If the player picks them self
+                if player.obj.id == game.players[ self.get_emoji(payload.emoji.name)].obj.id:  # If the player picks them self
                     await channel.send(f"You can\'t pick yourself, {self.bot.get_user(payload.user_id).name}.")
                 elif player.guess is not None:  # If player already made a guess
                     await channel.send(f"{self.bot.get_user(payload.user_id)}, you have already guessed this round.")
@@ -153,7 +151,6 @@ class Mafia(commands.Cog):
                         await winner.obj.edit(nick=nick)
                     except:
                         print("Bot doesn\'t have permission to change nickname for the winner.")
-
 
                 await self.bot.get_channel(payload.channel_id).send(scoreboard)
 
@@ -304,18 +301,19 @@ class Mafia(commands.Cog):
             return
 
         #  Send rules message
-        await ctx.send(f"To Start, everyone must go into the Mafia Queue channel. "
+        await ctx.send(f"```To Start, everyone must go into the Mafia Queue channel. "
                        f"Once it is full, those members will be automatically moved into a voice "
                        f"channel and a text channel will be created. Each player will also be DMed "
-                       f"with their team and role for the round. The goal of the mafia is to lose the game without being caught "
-                       f"throwing.\n\nAfter the Rocket League match is played, one person "
+                       f"with their team and role for the round. The goal of the mafia is to lose the game without "
+                       f"being caught throwing.\n\nAfter the Rocket League match is played, one person "
                        f"must report the team who won in the text channel using ?mafia report "
                        f"winning_team.\n\nThen, each player must guess who the mafia is using ?mafia guess "
                        f"username. Once each player, including the mafia, has guessed, each player who "
-                       f"correctly guessed who the mafia was will be awarded 1 point. The Jester will receive one point "
-                       f"for each player who guesses them. If no one guesses "
+                       f"correctly guessed who the mafia was will be awarded 1 point. The Jester will receive one point"
+                       f" for each player who guesses them. If no one guesses "
                        f"who the mafia is and the mafia\'s team loses, the mafia will be awarded 3 "
-                       f"points.\n\nWhichever player has the most points at the end of {settings.num_rounds} rounds wins.")
+                       f"points.\n\nWhichever player has the most points at the end of {settings.num_rounds} "
+                       f"rounds wins.```")
 
     @mafia.command()
     async def settings(self, ctx):
@@ -325,6 +323,17 @@ class Mafia(commands.Cog):
                 msg = await ctx.send(f"{setting}")
                 await asyncio.sleep(10)
                 await msg.delete()
+
+    @mafia.command()
+    async def spectate(self, ctx):
+        member = ctx.author
+        for channel in ctx.guild.channels:
+            if "Mafia Game Room" in channel.name:
+                await channel.set_permissions(member, connect=True, speak=False)
+            elif "mafia-text-room" in channel.name:
+                await channel.set_permissions(member, read_messages=True, read_message_history=True,
+                                              send_messages=False, add_reactions=False)
+
 
     @mafia.command()
     async def toggle_jester(self, ctx):
