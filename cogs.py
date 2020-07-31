@@ -165,6 +165,15 @@ class Mafia(commands.Cog):
                 shuffle(game.players)
 
                 blue = game.players[0:len(game.players) // 2]
+                orange = game.players[len(game.players) // 2:]
+
+                while blue in game.games_in_range(3)[0]:
+                    shuffle(game.players)
+                    blue = game.players[0:len(game.players) // 2]
+                    orange = game.players[len(game.players) // 2:]
+
+                game.past_blue_teams.append(blue)
+                game.past_orange_teams.append(orange)
 
                 shuffle(game.players)
                 for i, player in enumerate(game.players):
@@ -419,6 +428,7 @@ class Mafia(commands.Cog):
         shuffle(players)
 
         blue = players[0:len(players) // 2]
+        orange = players[len(players) // 2:]
 
         shuffle(players)
         for i, player in enumerate(players):
@@ -434,7 +444,12 @@ class Mafia(commands.Cog):
             else:
                 player_objects.append(Player(player.name, None, player, team))
         await self.msg_teams(player_objects, text)
-        self.games.append(Game(voice, text, player_objects, _setting))
+
+        g = Game(voice, text, player_objects, _setting)
+        self.games.append(g)
+
+        g.past_blue_teams.append(blue)
+        g.past_orange_teams.append(orange)
 
     async def create_game_channels(self, channel):
         guild = channel.guild
@@ -494,6 +509,17 @@ class Game:
             self.player_names.append(p.name)
         self.round_winner = None
         self.voting_message = None
+        self.past_blue_teams = []
+        self.past_orange_teams = []
+
+    def games_in_range(self, _range):
+        ret = []
+        for past in [self.past_blue_teams, self.past_orange_teams]:
+            if len(past) <= _range:
+                ret.append(past)
+            else:
+                ret.append(past[len(past) - _range:])
+        return ret
 
 
 class Settings:
