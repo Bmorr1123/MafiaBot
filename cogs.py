@@ -28,10 +28,6 @@ class Default(commands.Cog):
             await message.delete()
 
     @commands.command()
-    async def rank(self):
-        return
-
-    @commands.command()
     async def info(self, ctx):
         await ctx.send("This is a bot developed by Michael (Dolphino) and "
                        "Ben (Bmorr) made for playing Rocket League Mafia!")
@@ -51,13 +47,6 @@ class Mafia(commands.Cog):
         """All mafia related commands"""
         if ctx.invoked_subcommand is None:
             await ctx.send("Invalid sub command passed.")
-
-    # @mafia.command()
-    # async def change_nickname(self, ctx, nick: str):
-    #     try:
-    #         await ctx.author.edit(nick=nick)
-    #     except:
-    #         await ctx.send(f"Bot doesn\'t have permission to do that.")
 
     # commands.Cog.listener()
     @commands.Cog.listener()
@@ -89,21 +78,18 @@ class Mafia(commands.Cog):
                     player.guess = game.players[self.get_emoji(payload.emoji.name)].obj.id
 
         all_guessed = True
-        mafia, mafia_name, mafia_obj = None, None, None
-        jester, jester_name, jester_obj = None, None, None
+        mafia, mafia_name, mafia_obj = None, None, None; jester, jester_name, jester_obj = None, None, None
         for player in game.players:
             if player.guess is None:
                 all_guessed = False
             if player.role == "Mafia":
-                mafia = player.obj.id
-                mafia_name = player.name
-                mafia_obj = player
+                mafia = player.obj.id; mafia_name = player.name; mafia_obj = player
             elif player.role == "Jester":
-                jester = player.obj.id
-                jester_name = player.name
-                jester_obj = player
+                jester = player.obj.id; jester_name = player.name; jester_obj = player
 
         if all_guessed:
+            game.voting_message = None
+
             await self.bot.get_channel(payload.channel_id).send(
                 f"{mafia_name} was the **Mafia**!")  # Send message on who was the mafia
             if jester is not None:
@@ -126,71 +112,17 @@ class Mafia(commands.Cog):
 
             if game.round == game.total_rounds:  # If all the rounds of the game have been played
                 # Print out player scores
-                scoreboard = "__Game Over. Here are the results:__```\n"
-                ordered_players = self.sort_player_scores(game.players)
-                winner = ordered_players[0]
-                for player in ordered_players:
-                    scoreboard += f"{player.name} - {player.score}\n"
-                scoreboard += "```"
+                first, second = await self.show_scoreboard(game, payload)
 
-                if winner.score > ordered_players[1].score:
-                    guild_id = channel.guild.id
-                    settings = None
-                    for setting in self.settings:
-                        if setting.id == guild_id:
-                            settings = setting
-
-                    if settings.add_trophies is False:
-                        return
-                    if winner.obj.nick is None:
-                        nick = winner.obj.name + "🏆"
-                    else:
-                        nick = winner.obj.nick + "🏆"
-
-                    try:
-                        await winner.obj.edit(nick=nick)
-                    except:
-                        print("Bot doesn\'t have permission to change nickname for the winner.")
-
-                await self.bot.get_channel(payload.channel_id).send(scoreboard)
+                if first.score > second.score:
+                    await self.add_trophy(first.obj, channel.guild.id)
 
                 self.games.remove(game)  # Remove game from list of games
 
-                await asyncio.sleep(30)  # Wait 30 seconds
+                await asyncio.sleep(60)  # Wait 60 seconds
                 await self.bot.get_channel(payload.channel_id).delete()  # Delete text-channel
             else:  # If there are still rounds to play
-
-                for player in game.players:
-                    player.guess = None
-                shuffle(game.players)
-
-                blue = game.players[0:len(game.players) // 2]
-                orange = game.players[len(game.players) // 2:]
-
-                while blue in game.games_in_range(3)[0]:
-                    shuffle(game.players)
-                    blue = game.players[0:len(game.players) // 2]
-                    orange = game.players[len(game.players) // 2:]
-
-                game.past_blue_teams.append(blue)
-                game.past_orange_teams.append(orange)
-
-                shuffle(game.players)
-                for i, player in enumerate(game.players):
-                    team = "Orange"
-                    if player in blue:
-                        team = "Blue"
-                    player.team = team
-                    if i == 0:
-                        player.role = "Mafia"
-                        await player.obj.send(f"You are the MAFIA!")  # Send DM to mafia
-                    elif i == 1 and game.jester:
-                        player.role = "Jester"
-                        await player.obj.send(f"You are the JESTER!")  # Send DM to jester if jester mode is enabled
-                    else:
-                        player.role = None
-
-                await self.msg_teams(game.players, self.bot.get_channel(payload.channel_id))
+                await self.create_teams(game, payload)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -228,6 +160,16 @@ class Mafia(commands.Cog):
                 await asyncio.sleep(5)
                 await msg.delete()
                 break
+
+    # mafia.command()
+    # @mafia.command()
+    # async def past_teams(self, ctx):
+    #     g = None
+    #     for game in self.games:
+    #         if game.text_channel == ctx.channel:
+    #             g = game
+    #             break
+    #     await ctx.send(f"{}")
 
     # mafia.command()
     @mafia.command()
@@ -278,6 +220,13 @@ class Mafia(commands.Cog):
                 game = g
                 break
 
+        if game is None:
+            return
+
+        if game.voting_message is not None:
+            await ctx.send(f"There is already a voting panel for this round.")
+            return
+
         if arg.lower() == "blue":
             game.round_winner = "Blue"
         elif arg.lower() == "orange":
@@ -324,6 +273,22 @@ class Mafia(commands.Cog):
                        f"points.\n\nWhichever player has the most points at the end of {settings.num_rounds} "
                        f"rounds wins.```")
 
+    # @mafia.command()
+    # async def scoreboard(self, ctx):
+    #     game = None
+    #     for g in self.games:
+    #         if ctx.channel == g.text_channel:
+    #             game = g
+    #             break
+    #
+    #     scoreboard = "__Scoreboard:__```\n"
+    #     ordered_players = self.sort_player_scores(game.players)
+    #     for player in ordered_players:
+    #         scoreboard += f"{player.name} - {player.score}\n"
+    #     scoreboard += "```"
+    #
+    #     await ctx.send(scoreboard)
+
     @mafia.command()
     async def settings(self, ctx):
         guild_id = ctx.guild.id
@@ -335,6 +300,8 @@ class Mafia(commands.Cog):
 
     @mafia.command()
     async def spectate(self, ctx):
+        await ctx.message.delete()
+
         member = ctx.author
         for channel in ctx.guild.channels:
             if "Mafia Game Room" in channel.name:
@@ -342,7 +309,6 @@ class Mafia(commands.Cog):
             elif "mafia-text-room" in channel.name:
                 await channel.set_permissions(member, read_messages=True, read_message_history=True,
                                               send_messages=False, add_reactions=False)
-
 
     @mafia.command()
     async def toggle_jester(self, ctx):
@@ -390,6 +356,16 @@ class Mafia(commands.Cog):
 
 
     # Misc
+    def compute_teams(self, blue, past):
+        for team in past:
+            past = True
+            for player in blue:
+                if player not in team:
+                    past = False
+            if past:
+                return past
+        return False
+
     def get_emoji(self, emoji):
         for i, reaction in enumerate("🇦 🇧 🇨 🇩 🇪 🇫".split(" ")):
             if emoji in reaction or reaction in emoji:
@@ -415,6 +391,24 @@ class Mafia(commands.Cog):
             p.remove(highest)
         return ret
 
+    async def add_trophy(self, member, guild_id):
+        settings = None
+        for setting in self.settings:
+            if setting.id == guild_id:
+                settings = setting
+
+        if settings.add_trophies is False:
+            return
+        if member.nick is None:
+            nick = member.name + "🏆"
+        else:
+            nick = member.nick + "🏆"
+
+        try:
+            await member.edit(nick=nick)
+        except:
+            print("Bot doesn\'t have permission to change nickname for the winner.")
+
     async def create_game(self, channel):
         _setting = None
         guild_id = channel.guild.id
@@ -428,7 +422,6 @@ class Mafia(commands.Cog):
         shuffle(players)
 
         blue = players[0:len(players) // 2]
-        orange = players[len(players) // 2:]
 
         shuffle(players)
         for i, player in enumerate(players):
@@ -448,8 +441,7 @@ class Mafia(commands.Cog):
         g = Game(voice, text, player_objects, _setting)
         self.games.append(g)
 
-        g.past_blue_teams.append(blue)
-        g.past_orange_teams.append(orange)
+        g.past_teams.append(blue)
 
     async def create_game_channels(self, channel):
         guild = channel.guild
@@ -473,6 +465,41 @@ class Mafia(commands.Cog):
         await text_channel.send(f"__Players: {names[0:-2]}__\nUse \'?mafia help\' for help on reporting syntax.")
         return voice_channel, text_channel
 
+    async def create_teams(self, game, payload):
+        for player in game.players:
+            player.guess = None
+        shuffle(game.players)
+
+        blue = game.players[0:len(game.players) // 2]
+
+        i = 0
+        while self.compute_teams(blue, game.games_in_range(3)):
+            print("Duplicate Team")
+            if i == 5:
+                break
+            shuffle(game.players)
+            blue = game.players[0:len(game.players) // 2]
+            i += 1
+
+        game.past_teams.append(blue)
+
+        shuffle(game.players)
+        for i, player in enumerate(game.players):
+            team = "Orange"
+            if player in blue:
+                team = "Blue"
+            player.team = team
+            if i == 0:
+                player.role = "Mafia"
+                await player.obj.send(f"You are the MAFIA!")  # Send DM to mafia
+            elif i == 1 and game.jester:
+                player.role = "Jester"
+                await player.obj.send(f"You are the JESTER!")  # Send DM to jester if jester mode is enabled
+            else:
+                player.role = None
+
+        await self.msg_teams(game.players, self.bot.get_channel(payload.channel_id))
+
     async def msg_teams(self, players, text_channel):
         blue, orange = "", ""
         for player in players:
@@ -481,6 +508,18 @@ class Mafia(commands.Cog):
             else:
                 orange += f"\t{player.name}\n"
         await text_channel.send(f"```\nBlue:\n{blue}\nOrange:\n{orange}\nType ?mafia report [team color] to bring up voting!```")
+
+    async def show_scoreboard(self, game, payload):
+        scoreboard = "__Game Over. Here are the results:__```\n"
+        ordered_players = self.sort_player_scores(game.players)
+        first, second = ordered_players[0], ordered_players[1]
+        for player in ordered_players:
+            scoreboard += f"{player.name} - {player.score}\n"
+        scoreboard += "```"
+
+        await self.bot.get_channel(payload.channel_id).send(scoreboard)
+
+        return first, second
 
 
 class Player:
@@ -509,12 +548,11 @@ class Game:
             self.player_names.append(p.name)
         self.round_winner = None
         self.voting_message = None
-        self.past_blue_teams = []
-        self.past_orange_teams = []
+        self.past_teams = []
 
     def games_in_range(self, _range):
         ret = []
-        for past in [self.past_blue_teams, self.past_orange_teams]:
+        for past in self.past_teams:
             if len(past) <= _range:
                 ret.append(past)
             else:
