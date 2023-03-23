@@ -37,7 +37,7 @@ class Mafia(commands.Cog):
     async def mafia(self, ctx):
         """All mafia related commands"""
         if ctx.invoked_subcommand is None:
-            await self.bot.say("Invalid sub command passed.")
+            await ctx.send("Invalid sub command passed.")
 
     def is_queue_channel(self, channel):
         if channel is None:

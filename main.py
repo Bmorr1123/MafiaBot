@@ -1,14 +1,21 @@
 from discord.ext import commands
 from cogs import *
-
-lines = open("config.txt", "r").readlines()
-def get_key(key):
-    for line in lines:
-        if line.startswith(key):
-            return line[line.find(":") + 1:].replace("\n", "")
+import json
 
 
-bot = commands.Bot(command_prefix=get_key("prefix"))
+'''
+https://discord.com/api/oauth2/authorize?client_id=714649492036517930&permissions=8&scope=bot
+
+'''
+
+
+config = {}
+with open("config.json", "r") as file:
+    for key, value in json.load(file).items():
+        config[key] = value
+
+
+bot = commands.Bot(command_prefix=config["prefix"])
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -19,5 +26,5 @@ for cog in cogs:
     bot.add_cog(cog)
     print(f"Loaded \"{cog.qualified_name}\" cog!")
 
-print(get_key("token"))
-bot.run(get_key("token"))
+print(config["token"])
+bot.run(config["token"])
